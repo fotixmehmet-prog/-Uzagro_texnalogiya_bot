@@ -1,44 +1,60 @@
 import asyncio
-import requests
+import logging
+import google.generativeai as genai
 from aiogram import Bot, Dispatcher, types, F
-from flask import Flask
 from threading import Thread
-import os
 
-# --- TOKENLAR ---
-TG_TOKEN = "8731206134:AAEgFuDA1yUCMsyK1XWRsFQc54RHpTqWbAw"
-GEMINI_KEY = "AIzaSyCGxNtX7SBwJDb3whBocgMN-TFgrvr052U"
+# 1. Sozlamalar (O'zingizning API kalitlarni qo'ying)
+API_TOKEN = 'BOT_TOKENINGIZ_BU_YERGA'
+GOOGLE_API_KEY = 'GEMINI_API_KEY_BU_YERGA'
 
-bot = Bot(token=TG_TOKEN)
+# Gemini konfiguratsiyasi
+genai.configure(api_key=GOOGLE_API_KEY)
+model = genai.GenerativeModel('gemini-pro')
+
+# Bot va Dispatcher obyektlari
+bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
-app = Flask('')
 
-@app.route('/')
-def home():
-    return "Bot is live!"
-
-def run():
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port)
-
-def ask_gemini(text):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
+# 2. Gemini bilan asinxron muloqot funksiyasi
+async def ask_gemini(prompt):
     try:
-        res = requests.post(url, json={"contents": [{"parts": [{"text": text}]}]}, timeout=30)
-        data = res.json()
-        return data['candidates'][0]['content']['parts'][0]['text']
-    except:
-        return "⚠️ Google API ulanishda xato berdi!"
+        # generate_content_async - bu asinxron kutish imkonini beradi
+        response = await model.generate_content_async(prompt)
+        return response.text
+    except Exception as e:
+        return f"⚠️ Google API ulanishda xato: {str(e)}"
 
+# 3. Xabarlarni qabul qilish (Handle)
 @dp.message(F.text)
 async def handle(msg: types.Message):
+    # Bot "yozmoqda..." holatini ko'rsatadi
     await bot.send_chat_action(msg.chat.id, "typing")
-    answer = ask_gemini(msg.text)
+    
+    # Gemini'dan javobni asinxron kutamiz (await muhim!)
+    answer = await ask_gemini(msg.text)
+    
+    # Foydalanuvchiga javob qaytaramiz
     await msg.reply(answer)
 
+# 4. Qo'shimcha funksiya (agar Thread kerak bo'lsa)
+def run():
+    print("Qo'shimcha Thread ishga tushdi...")
+
+# 5. Asosiy ishga tushirish qismi
 async def main():
+    # Loggingni yoqish (xatolarni ko'rish uchun)
+    logging.basicConfig(level=logging.INFO)
+    
+    # Threadni ishga tushirish (agar rasmda ko'rsatganingizdek kerak bo'lsa)
     Thread(target=run).start()
+    
+    # Botni ishga tushirish
+    print("Bot ishga tushdi...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        print("Bot to'xtatildi!")
