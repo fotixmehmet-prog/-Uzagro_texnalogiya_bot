@@ -35,7 +35,7 @@ def ask_gemini(text):
 async def handle(msg: types.Message):
     await bot.send_chat_action(msg.chat.id, "typing")
     answer = ask_gemini(msg.text)
-    await message.reply(answer)
+    await msg.reply(answer)
 
 async def main():
     # Flask serverni alohida oqimda yurgizish (Render uchun)
